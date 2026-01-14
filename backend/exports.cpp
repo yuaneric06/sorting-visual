@@ -9,9 +9,9 @@ extern "C"
         engine.init(quantity, algorithm);
     }
 
-    void step()
+    Op *step()
     {
-        engine.step();
+        return engine.step();
     }
 
     long long *get_arr()

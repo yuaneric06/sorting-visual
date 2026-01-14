@@ -5,7 +5,10 @@ import './App.css'
 export default function App() {
   const wasmRef = useRef(null);
   const canvasRef = useRef(null);
+  const ctxRef = useRef(null);
+  const dprRef = useRef(window.devicePixelRatio || 1);
   const quantity = useRef(null);
+  const currIdx = useRef(null);
   const [isRunning, setIsRunning] = useState(false);
 
   useEffect(() => {
@@ -13,25 +16,69 @@ export default function App() {
       wasmRef.current = Module;
     }).catch(error => {
       console.error("Error with loading WASM: ", error);
-    })
+    });
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const setup = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+
+      dprRef.current = dpr;
+
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      ctxRef.current = ctx;
+
+      // if (wasmRef.current) {
+      //   initCanvas(wasmRef.current, ctx);
+      // }
+    };
+
+    setup();
+    window.addEventListener("resize", setup);
+
+    return () => window.removeEventListener("resize", setup);
   }, []);
 
   useEffect(() => {
     if (!isRunning) return;
 
     const Module = wasmRef.current;
+    const ctx = ctxRef.current;
     let rafId;
+    let running = true;
 
+    initCanvas(Module, ctx);
     const loop = () => {
-      Module._step();
-      draw(Module);
+      if (!running) return;
+      const ptr = Module._step();
+      const heap = Module.HEAP64;
+
+      const base = ptr / 8;
+      console.log(heap[base], heap[base + 1]);
+      if (heap[base] === -1n) {
+        running = false;
+        return;
+      }
+      console.log("drawing");
+      draw(ctx, heap[base], heap[base + 1]);
 
       rafId = requestAnimationFrame(loop);
     };
 
     rafId = requestAnimationFrame(loop);
 
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      running = false;
+      setIsRunning(false);
+      cancelAnimationFrame(rafId)
+    };
   }, [isRunning])
 
   const handleSubmit = (e) => {
@@ -46,33 +93,51 @@ export default function App() {
     const Module = wasmRef.current;
     Module._init(_quantity, algorithm);
     setIsRunning(true);
+    initCanvas(Module, ctxRef.current);
   }
 
-  const draw = (Module) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+  const initCanvas = (Module, ctx) => {
     const body_ptr = Module._get_arr();
     const heap = Module.HEAP64;
 
     const stride = 8 / 8;
     const base = body_ptr / 8;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
 
     const cellWidth = width / Number(quantity.current);
     const heightStride = height / Number(quantity.current);
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "white";
+    ctx.beginPath();
     for (let i = 0; i < quantity.current; i++) {
       const idx = base + i * stride;
-      console.log("i: %d, num: %d", i, heap[idx]);
+      // console.log("i: %d, num: %d", i, heap[idx]);
       const cellHeight = Number(heap[idx]) * heightStride;
-      console.log(cellWidth, height, cellHeight);
+      // console.log(cellWidth, height, cellHeight);
       ctx.rect(cellWidth * i, height - cellHeight, cellWidth, cellHeight);
       ctx.fill();
     }
+  }
+
+  const draw = (ctx, idx, val) => {
+    console.log("updating index %d with value %d", idx, val);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+
+    const cellWidth = width / Number(quantity.current);
+    const heightStride = height / Number(quantity.current);
+
+    ctx.clearRect(cellWidth * Number(idx), 0, cellWidth, height);
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    const cellHeight = Number(val) * heightStride;
+    ctx.rect(cellWidth * Number(idx), height - cellHeight, cellWidth, cellHeight);
+    ctx.fill();
   }
 
   return (
