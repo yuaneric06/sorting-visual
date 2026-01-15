@@ -10,10 +10,14 @@ private:
     void scramble();
     void merge_sort(long long l, long long r);
     void merge(long long l, long long mid, long long r);
+    void quick_sort(long long l, long long r);
+    long long partition(long long l, long long r);
     std::queue<Op> ops;
+    long long op_cnt;
 
 public:
     void init(long long quantity, int algorithm);
     long long *get_arr();
+    long long *get_op_cnt();
     Op *step();
 };

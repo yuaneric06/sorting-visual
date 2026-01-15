@@ -5,10 +5,13 @@ import './App.css'
 export default function App() {
   const wasmRef = useRef(null);
   const canvasRef = useRef(null);
+  const sCanvasRef = useRef(null);
   const ctxRef = useRef(null);
+  const sCtxRef = useRef(null);
   const dprRef = useRef(window.devicePixelRatio || 1);
   const quantity = useRef(null);
-  const currIdx = useRef(null);
+  const opsCntPtr = useRef(0);
+  const algorithm = useRef(null);
   const [isRunning, setIsRunning] = useState(false);
 
   useEffect(() => {
@@ -22,7 +25,7 @@ export default function App() {
     if (!canvas) return;
 
     const setup = () => {
-      const rect = canvas.getBoundingClientRect();
+      let rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
 
       dprRef.current = dpr;
@@ -35,9 +38,20 @@ export default function App() {
 
       ctxRef.current = ctx;
 
-      // if (wasmRef.current) {
-      //   initCanvas(wasmRef.current, ctx);
-      // }
+      const sCanvas = sCanvasRef.current;
+      rect = sCanvas.getBoundingClientRect();
+      sCanvas.width = Math.round(rect.width * dpr);
+      sCanvas.height = Math.round(rect.height * dpr);
+
+      const sCtx = sCanvas.getContext("2d");
+      sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      sCtxRef.current = sCtx;
+
+      sCtx.fillStyle = "white";
+      sCtx.font = "15px Fira Code";
+      sCtx.fillText("Operations done:", 20, 30);
+      // sCtx.fillText(String(opsCnt.current), 170, 30);
     };
 
     setup();
@@ -48,35 +62,59 @@ export default function App() {
 
   useEffect(() => {
     if (!isRunning) return;
+    console.log("entering useEffect");
 
     const Module = wasmRef.current;
     const ctx = ctxRef.current;
+    const sCtx = sCtxRef.current;
     let rafId;
-    let running = true;
+    const swapOp = algorithm.current == 2;
+    let loop;
 
     initCanvas(Module, ctx);
-    const loop = () => {
-      if (!running) return;
-      const ptr = Module._step();
-      const heap = Module.HEAP64;
+    console.log("frontend canvas initialized");
+    if (swapOp) {
+      loop = () => {
+        let ptr = Module._step();
+        let heap = Module.HEAP64;
 
-      const base = ptr / 8;
-      console.log(heap[base], heap[base + 1]);
-      if (heap[base] === -1n) {
-        running = false;
-        return;
-      }
-      console.log("drawing");
-      draw(ctx, heap[base], heap[base + 1]);
+        let base = ptr / 8;
+        // console.log(heap[base], heap[base + 1]);
+        if (heap[base] === -1n) {
+          setIsRunning(false);
+          return;
+        }
+        // console.log("drawing");
+        draw(ctx, sCtx, heap[base], heap[base + 1]);
 
-      rafId = requestAnimationFrame(loop);
-    };
+        ptr = Module._step();
+        base = ptr / 8;
+        draw(ctx, sCtx, heap[base], heap[base + 1]);
 
+        rafId = requestAnimationFrame(loop);
+      };
+    }
+    else {
+      loop = () => {
+        const ptr = Module._step();
+        const heap = Module.HEAP64;
+
+        const base = ptr / 8;
+        // console.log(heap[base], heap[base + 1]);
+        if (heap[base] === -1n) {
+          setIsRunning(false);
+          return;
+        }
+        // console.log("drawing");
+        draw(ctx, sCtx, heap[base], heap[base + 1]);
+
+        rafId = requestAnimationFrame(loop);
+      };
+    }
+    console.log("entering draw loop");
     rafId = requestAnimationFrame(loop);
 
     return () => {
-      running = false;
-      setIsRunning(false);
       cancelAnimationFrame(rafId)
     };
   }, [isRunning])
@@ -86,14 +124,14 @@ export default function App() {
 
     const formData = new FormData(e.currentTarget);
     const _quantity = BigInt(formData.get("quantity"));
-    const algorithm = Number(formData.get("algorithm"));
+    const _algorithm = Number(formData.get("algorithm"));
     quantity.current = _quantity;
+    algorithm.current = _algorithm;
+    console.log("frontend form submitted");
 
-    // console.log(quantity)
     const Module = wasmRef.current;
-    Module._init(_quantity, algorithm);
+    Module._init(_quantity, _algorithm);
     setIsRunning(true);
-    initCanvas(Module, ctxRef.current);
   }
 
   const initCanvas = (Module, ctx) => {
@@ -112,6 +150,7 @@ export default function App() {
 
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "white";
+
     ctx.beginPath();
     for (let i = 0; i < quantity.current; i++) {
       const idx = base + i * stride;
@@ -123,8 +162,8 @@ export default function App() {
     }
   }
 
-  const draw = (ctx, idx, val) => {
-    console.log("updating index %d with value %d", idx, val);
+  const draw = (ctx, sCtx, idx, val) => {
+    // console.log("updating index %d with value %d", idx, val);
     const rect = canvasRef.current.getBoundingClientRect();
     const width = rect.width;
     const height = rect.height;
@@ -132,8 +171,16 @@ export default function App() {
     const cellWidth = width / Number(quantity.current);
     const heightStride = height / Number(quantity.current);
 
+    // opsCnt.current++;
+
     ctx.clearRect(cellWidth * Number(idx), 0, cellWidth, height);
     ctx.fillStyle = "white";
+
+    sCtx.fillStyle = "white";
+    sCtx.font = "15px Fira Code";
+    sCtx.clearRect(100, 0, 200, 100);
+    // sCtx.fillText(String(opsCnt.current), 170, 30);
+
     ctx.beginPath();
     const cellHeight = Number(val) * heightStride;
     ctx.rect(cellWidth * Number(idx), height - cellHeight, cellWidth, cellHeight);
@@ -161,9 +208,11 @@ export default function App() {
 
           <button>Run</button>
         </form>
+
+        <canvas className="stats" ref={sCanvasRef} />
       </header>
 
-      <canvas ref={canvasRef} />
+      <canvas className="mainCanvas" ref={canvasRef} />
     </main>
   )
 }

@@ -14,6 +14,11 @@ extern "C"
         return engine.step();
     }
 
+    long long *get_op_cnt()
+    {
+        return engine.get_op_cnt();
+    }
+
     long long *get_arr()
     {
         return engine.get_arr();

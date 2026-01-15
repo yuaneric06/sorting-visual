@@ -21,10 +21,20 @@ main {
   min-height: 0;
 }
 
-canvas {
+.mainCanvas {
   /* border: solid 5px gray; */
   min-height: 0;
   flex: 1 1 auto;
   display: block;
   box-sizing: border-box;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.stats {
+  flex: 1 1 auto;
+  height: 60px;
 }

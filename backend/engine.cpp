@@ -17,6 +17,7 @@ void Engine::scramble()
 void Engine::init(long long quantity, int algorithm)
 {
     std::cout << "running the " << algorithm << " algorithm with " << quantity << " units\n";
+    op_cnt = 0;
     arr.resize(quantity);
     for (long long i = 1; i <= quantity; i++)
     {
@@ -36,11 +37,27 @@ void Engine::init(long long quantity, int algorithm)
         }
         std::cout << "\n";
     }
+    else if (algorithm == 2)
+    {
+        // quick sort
+        quick_sort(0, quantity - 1);
+        std::cout << "quick sort complete\n";
+        for (long long a : arr)
+        {
+            std::cout << a << " ";
+        }
+        std::cout << "\n";
+    }
 }
 
 long long *Engine::get_arr()
 {
     return original_arr.data();
+}
+
+long long *Engine::get_op_cnt()
+{
+    return &op_cnt;
 }
 
 Op *Engine::step()
@@ -116,4 +133,35 @@ void Engine::merge_sort(long long l, long long r)
     merge_sort(l, mid);
     merge_sort(mid + 1, r);
     merge(l, mid, r);
+}
+
+void Engine::quick_sort(long long l, long long r)
+{
+    if (l < r)
+    {
+        long long pi = partition(l, r);
+        quick_sort(l, pi - 1);
+        quick_sort(pi + 1, r);
+    }
+}
+
+long long Engine::partition(long long l, long long r)
+{
+    long long i = l - 1, j = l;
+    long long pivot = arr[r];
+    while (j < r)
+    {
+        if (arr[j] < pivot)
+        {
+            i++;
+            std::swap(arr[i], arr[j]);
+            ops.push({j, arr[j]});
+            ops.push({i, arr[i]});
+        }
+        j++;
+    }
+    std::swap(arr[i + 1], arr[r]);
+    ops.push({r, arr[r]});
+    ops.push({i + 1, arr[i + 1]});
+    return i + 1;
 }
