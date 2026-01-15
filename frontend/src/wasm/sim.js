@@ -4325,6 +4325,7 @@ function checkIncomingModuleAPI() {
 // Imports from the Wasm binary.
 var _init = Module['_init'] = makeInvalidEarlyAccess('_init');
 var _step = Module['_step'] = makeInvalidEarlyAccess('_step');
+var _get_op_cnt = Module['_get_op_cnt'] = makeInvalidEarlyAccess('_get_op_cnt');
 var _get_arr = Module['_get_arr'] = makeInvalidEarlyAccess('_get_arr');
 var _fflush = makeInvalidEarlyAccess('_fflush');
 var _strerror = makeInvalidEarlyAccess('_strerror');
@@ -4342,6 +4343,7 @@ var wasmMemory = makeInvalidEarlyAccess('wasmMemory');
 function assignWasmExports(wasmExports) {
   assert(typeof wasmExports['init'] != 'undefined', 'missing Wasm export: init');
   assert(typeof wasmExports['step'] != 'undefined', 'missing Wasm export: step');
+  assert(typeof wasmExports['get_op_cnt'] != 'undefined', 'missing Wasm export: get_op_cnt');
   assert(typeof wasmExports['get_arr'] != 'undefined', 'missing Wasm export: get_arr');
   assert(typeof wasmExports['fflush'] != 'undefined', 'missing Wasm export: fflush');
   assert(typeof wasmExports['strerror'] != 'undefined', 'missing Wasm export: strerror');
@@ -4356,6 +4358,7 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports['__indirect_function_table'] != 'undefined', 'missing Wasm export: __indirect_function_table');
   _init = Module['_init'] = createExportWrapper('init', 2);
   _step = Module['_step'] = createExportWrapper('step', 0);
+  _get_op_cnt = Module['_get_op_cnt'] = createExportWrapper('get_op_cnt', 0);
   _get_arr = Module['_get_arr'] = createExportWrapper('get_arr', 0);
   _fflush = createExportWrapper('fflush', 1);
   _strerror = createExportWrapper('strerror', 1);

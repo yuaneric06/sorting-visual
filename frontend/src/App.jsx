@@ -10,7 +10,6 @@ export default function App() {
   const sCtxRef = useRef(null);
   const dprRef = useRef(window.devicePixelRatio || 1);
   const quantity = useRef(null);
-  const opsCntPtr = useRef(0);
   const algorithm = useRef(null);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -51,7 +50,7 @@ export default function App() {
       sCtx.fillStyle = "white";
       sCtx.font = "15px Fira Code";
       sCtx.fillText("Operations done:", 20, 30);
-      // sCtx.fillText(String(opsCnt.current), 170, 30);
+      sCtx.fillText("0", 170, 30);
     };
 
     setup();
@@ -84,6 +83,7 @@ export default function App() {
           setIsRunning(false);
           return;
         }
+        updateOpCnt(sCtx);
         // console.log("drawing");
         draw(ctx, sCtx, heap[base], heap[base + 1]);
 
@@ -91,11 +91,13 @@ export default function App() {
         base = ptr / 8;
         draw(ctx, sCtx, heap[base], heap[base + 1]);
 
+
         rafId = requestAnimationFrame(loop);
       };
     }
     else {
       loop = () => {
+        console.log("draw loop executed");
         const ptr = Module._step();
         const heap = Module.HEAP64;
 
@@ -106,6 +108,7 @@ export default function App() {
           return;
         }
         // console.log("drawing");
+        updateOpCnt(sCtx);
         draw(ctx, sCtx, heap[base], heap[base + 1]);
 
         rafId = requestAnimationFrame(loop);
@@ -176,15 +179,22 @@ export default function App() {
     ctx.clearRect(cellWidth * Number(idx), 0, cellWidth, height);
     ctx.fillStyle = "white";
 
-    sCtx.fillStyle = "white";
-    sCtx.font = "15px Fira Code";
-    sCtx.clearRect(100, 0, 200, 100);
-    // sCtx.fillText(String(opsCnt.current), 170, 30);
-
     ctx.beginPath();
     const cellHeight = Number(val) * heightStride;
     ctx.rect(cellWidth * Number(idx), height - cellHeight, cellWidth, cellHeight);
     ctx.fill();
+  }
+
+  const updateOpCnt = (sCtx) => {
+    const Module = wasmRef.current;
+    const heap = Module.HEAP64;
+    const base = Module._get_op_cnt() / 8;
+    const cnt = heap[base];
+
+    sCtx.fillStyle = "white";
+    sCtx.font = "15px Fira Code";
+    sCtx.clearRect(100, 0, 200, 100);
+    sCtx.fillText(String(algorithm.current >= 1 ? cnt / BigInt(2) : cnt), 170, 30);
   }
 
   return (
@@ -200,9 +210,12 @@ export default function App() {
             <label for="algorithm">Algorithm: </label>
             <select name="algorithm" id="algorithm">
               <option value="" disable select hidden>Select an algorithm</option>
-              <option value="0">Bubble</option>
-              <option value="1">Merge</option>
+              <option value="0">Merge</option>
+              <option value="1">Insertion</option>
               <option value="2">Quick</option>
+              <option value="3">Selection</option>
+              <option value="4">Bubble</option>
+              <option value="5">Heap</option>
             </select>
           </div>
 

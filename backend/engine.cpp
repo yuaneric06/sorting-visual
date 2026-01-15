@@ -4,6 +4,8 @@
 #include <utility>
 #include <iostream>
 
+long long Engine::op_cnt = 0;
+
 void Engine::scramble()
 {
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
@@ -19,6 +21,8 @@ void Engine::init(long long quantity, int algorithm)
     std::cout << "running the " << algorithm << " algorithm with " << quantity << " units\n";
     op_cnt = 0;
     arr.resize(quantity);
+    while (!ops.empty())
+        ops.pop();
     for (long long i = 1; i <= quantity; i++)
     {
         arr[i - 1] = i;
@@ -27,26 +31,26 @@ void Engine::init(long long quantity, int algorithm)
     scramble();
     std::cout << "scrambled\n";
     original_arr = arr;
-    if (algorithm == 1)
-    { // merge sort
-        merge_sort(0, quantity - 1);
-        std::cout << "merge sort complete\n";
-        for (long long a : arr)
-        {
-            std::cout << a << " ";
-        }
-        std::cout << "\n";
-    }
-    else if (algorithm == 2)
+    switch (algorithm)
     {
-        // quick sort
+    case 0:
+        merge_sort(0, quantity - 1);
+        break;
+    case 1:
+        insertion_sort();
+        break;
+    case 2:
         quick_sort(0, quantity - 1);
-        std::cout << "quick sort complete\n";
-        for (long long a : arr)
-        {
-            std::cout << a << " ";
-        }
-        std::cout << "\n";
+        break;
+    case 3:
+        selection_sort();
+        break;
+    case 4:
+        bubble_sort();
+        break;
+    case 5:
+        heap_sort();
+        break;
     }
 }
 
@@ -68,6 +72,7 @@ Op *Engine::step()
         return &op;
     }
     Op *op = &ops.front();
+    op_cnt++;
     ops.pop();
     return op;
 }
@@ -164,4 +169,100 @@ long long Engine::partition(long long l, long long r)
     ops.push({r, arr[r]});
     ops.push({i + 1, arr[i + 1]});
     return i + 1;
+}
+
+void Engine::bubble_sort()
+{
+    bool swapped = false;
+    for (long long i = 0; i < arr.size(); i++)
+    {
+        for (long long j = 1; j < arr.size(); j++)
+        {
+            if (arr[j] < arr[j - 1])
+            {
+                std::swap(arr[j], arr[j - 1]);
+                ops.push({j, arr[j]});
+                ops.push({j - 1, arr[j - 1]});
+                swapped = true;
+            }
+        }
+        if (!swapped)
+            break;
+    }
+}
+
+void Engine::selection_sort()
+{
+    for (long long i = 0; i < arr.size() - 1; i++)
+    {
+        long long min_idx = i;
+        for (long long j = i + 1; j < arr.size(); j++)
+        {
+            if (arr[j] < arr[min_idx])
+            {
+                min_idx = j;
+            }
+        }
+        std::swap(arr[i], arr[min_idx]);
+        ops.push({min_idx, arr[min_idx]});
+        ops.push({i, arr[i]});
+    }
+}
+
+void Engine::insertion_sort()
+{
+    for (long long i = 1; i < arr.size(); i++)
+    {
+        long long key = arr[i];
+        long long j = i - 1;
+        while (j >= 0 && arr[j] > key)
+        {
+            arr[j + 1] = arr[j];
+            ops.push({j + 1, arr[j + 1]});
+            j--;
+        }
+        arr[j + 1] = key;
+        ops.push({j + 1, arr[j + 1]});
+    }
+}
+
+void Engine::heapify(long long n, long long root)
+{
+    long long largest = root;
+    long long left = root * 2 + 1;
+    long long right = root * 2 + 2;
+
+    if (left < n && arr[left] > arr[largest])
+    {
+        largest = left;
+    }
+    if (right < n && arr[right] > arr[largest])
+    {
+        largest = right;
+    }
+
+    if (largest != root)
+    {
+        std::swap(arr[largest], arr[root]);
+        ops.push({largest, arr[largest]});
+        ops.push({root, arr[root]});
+        heapify(n, largest);
+    }
+}
+
+void Engine::heap_sort()
+{
+    long long n = arr.size();
+    for (long long i = n / 2 - 1; i >= 0; i--)
+    {
+        heapify(n, i);
+    }
+
+    for (long long i = n - 1; i >= 0; i--)
+    {
+        std::swap(arr[0], arr[i]);
+        ops.push({0, arr[0]});
+        ops.push({i, arr[i]});
+        heapify(i, 0);
+    }
 }
