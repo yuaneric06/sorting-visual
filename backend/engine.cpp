@@ -4,7 +4,7 @@
 #include <utility>
 #include <iostream>
 
-long long Engine::op_cnt = 0;
+int Engine::op_cnt = 0;
 
 void Engine::scramble()
 {
@@ -16,20 +16,19 @@ void Engine::scramble()
     }
 }
 
-void Engine::init(long long quantity, int algorithm)
+void Engine::init(int quantity, int algorithm)
 {
     std::cout << "running the " << algorithm << " algorithm with " << quantity << " units\n";
     op_cnt = 0;
     arr.resize(quantity);
     while (!ops.empty())
         ops.pop();
-    for (long long i = 1; i <= quantity; i++)
+    for (int i = 1; i <= quantity; i++)
     {
         arr[i - 1] = i;
     }
-    std::cout << "initialized\n";
     scramble();
-    std::cout << "scrambled\n";
+    std::cout << "array of size " << quantity << " has been scrambled\n";
     original_arr = arr;
     switch (algorithm)
     {
@@ -51,15 +50,18 @@ void Engine::init(long long quantity, int algorithm)
     case 5:
         heap_sort();
         break;
+    case 6:
+        cycle_sort();
+        break;
     }
 }
 
-long long *Engine::get_arr()
+int *Engine::get_arr()
 {
     return original_arr.data();
 }
 
-long long *Engine::get_op_cnt()
+int *Engine::get_op_cnt()
 {
     return &op_cnt;
 }
@@ -74,27 +76,28 @@ Op *Engine::step()
     Op *op = &ops.front();
     op_cnt++;
     ops.pop();
+    original_arr[(*op).idx] = (*op).val;
     return op;
 }
 
-void Engine::merge(long long l, long long mid, long long r)
+void Engine::merge(int l, int mid, int r)
 {
-    long long k = l;
-    long long n1 = mid - l + 1;
-    long long n2 = r - mid;
-    std::vector<long long> left_arr(n1);
-    std::vector<long long> right_arr(n2);
+    int k = l;
+    int n1 = mid - l + 1;
+    int n2 = r - mid;
+    std::vector<int> left_arr(n1);
+    std::vector<int> right_arr(n2);
 
-    for (long long i = 0; i < n1; i++)
+    for (int i = 0; i < n1; i++)
     {
         left_arr[i] = arr[i + l];
     }
-    for (long long i = 0; i < n2; i++)
+    for (int i = 0; i < n2; i++)
     {
         right_arr[i] = arr[i + mid + 1];
     }
 
-    long long i = 0, j = 0;
+    int i = 0, j = 0;
     while (i < n1 && j < n2)
     {
         if (left_arr[i] < right_arr[j])
@@ -127,33 +130,33 @@ void Engine::merge(long long l, long long mid, long long r)
     }
 }
 
-void Engine::merge_sort(long long l, long long r)
+void Engine::merge_sort(int l, int r)
 {
     if (l >= r)
     {
         return;
     }
 
-    long long mid = l + (r - l) / 2;
+    int mid = l + (r - l) / 2;
     merge_sort(l, mid);
     merge_sort(mid + 1, r);
     merge(l, mid, r);
 }
 
-void Engine::quick_sort(long long l, long long r)
+void Engine::quick_sort(int l, int r)
 {
     if (l < r)
     {
-        long long pi = partition(l, r);
+        int pi = partition(l, r);
         quick_sort(l, pi - 1);
         quick_sort(pi + 1, r);
     }
 }
 
-long long Engine::partition(long long l, long long r)
+int Engine::partition(int l, int r)
 {
-    long long i = l - 1, j = l;
-    long long pivot = arr[r];
+    int i = l - 1, j = l;
+    int pivot = arr[r];
     while (j < r)
     {
         if (arr[j] < pivot)
@@ -174,9 +177,9 @@ long long Engine::partition(long long l, long long r)
 void Engine::bubble_sort()
 {
     bool swapped = false;
-    for (long long i = 0; i < arr.size(); i++)
+    for (int i = 0; i < arr.size(); i++)
     {
-        for (long long j = 1; j < arr.size(); j++)
+        for (int j = 1; j < arr.size(); j++)
         {
             if (arr[j] < arr[j - 1])
             {
@@ -193,10 +196,10 @@ void Engine::bubble_sort()
 
 void Engine::selection_sort()
 {
-    for (long long i = 0; i < arr.size() - 1; i++)
+    for (int i = 0; i < arr.size() - 1; i++)
     {
-        long long min_idx = i;
-        for (long long j = i + 1; j < arr.size(); j++)
+        int min_idx = i;
+        for (int j = i + 1; j < arr.size(); j++)
         {
             if (arr[j] < arr[min_idx])
             {
@@ -211,10 +214,10 @@ void Engine::selection_sort()
 
 void Engine::insertion_sort()
 {
-    for (long long i = 1; i < arr.size(); i++)
+    for (int i = 1; i < arr.size(); i++)
     {
-        long long key = arr[i];
-        long long j = i - 1;
+        int key = arr[i];
+        int j = i - 1;
         while (j >= 0 && arr[j] > key)
         {
             arr[j + 1] = arr[j];
@@ -226,11 +229,11 @@ void Engine::insertion_sort()
     }
 }
 
-void Engine::heapify(long long n, long long root)
+void Engine::heapify(int n, int root)
 {
-    long long largest = root;
-    long long left = root * 2 + 1;
-    long long right = root * 2 + 2;
+    int largest = root;
+    int left = root * 2 + 1;
+    int right = root * 2 + 2;
 
     if (left < n && arr[left] > arr[largest])
     {
@@ -252,17 +255,67 @@ void Engine::heapify(long long n, long long root)
 
 void Engine::heap_sort()
 {
-    long long n = arr.size();
-    for (long long i = n / 2 - 1; i >= 0; i--)
+    int n = arr.size();
+    for (int i = n / 2 - 1; i >= 0; i--)
     {
         heapify(n, i);
     }
 
-    for (long long i = n - 1; i >= 0; i--)
+    for (int i = n - 1; i >= 0; i--)
     {
         std::swap(arr[0], arr[i]);
         ops.push({0, arr[0]});
         ops.push({i, arr[i]});
         heapify(i, 0);
+    }
+}
+
+void Engine::cycle_sort()
+{
+    int n = arr.size();
+    for (int i = 0; i < n - 1; i++)
+    {
+        int item = arr[i];
+        int pos = i;
+        for (int j = i + 1; j < n; j++)
+        {
+            if (arr[j] < item)
+            {
+                pos++;
+            }
+        }
+
+        if (pos == i)
+            continue;
+
+        while (arr[pos] == item)
+            pos++;
+
+        if (pos != i)
+        {
+            std::swap(arr[pos], item);
+            ops.push({i, arr[i]});
+            ops.push({pos, arr[pos]});
+        }
+
+        while (pos != i)
+        {
+            pos = i;
+            for (int j = i + 1; j < n; j++)
+            {
+                if (arr[j] < item)
+                    pos++;
+            }
+
+            while (item == arr[pos])
+                pos++;
+
+            if (item != arr[pos])
+            {
+                std::swap(item, arr[pos]);
+                ops.push({i, arr[i]});
+                ops.push({pos, arr[pos]});
+            }
+        }
     }
 }

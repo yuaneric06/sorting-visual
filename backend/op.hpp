@@ -2,6 +2,6 @@
 
 struct Op
 {
-    long long idx;
-    long long val;
+    int idx;
+    int val;
 };

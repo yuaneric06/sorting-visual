@@ -4,7 +4,7 @@ static Engine engine;
 
 extern "C"
 {
-    void init(long long quantity, int algorithm)
+    void init(int quantity, int algorithm)
     {
         engine.init(quantity, algorithm);
     }
@@ -14,12 +14,12 @@ extern "C"
         return engine.step();
     }
 
-    long long *get_op_cnt()
+    int *get_op_cnt()
     {
         return engine.get_op_cnt();
     }
 
-    long long *get_arr()
+    int *get_arr()
     {
         return engine.get_arr();
     }

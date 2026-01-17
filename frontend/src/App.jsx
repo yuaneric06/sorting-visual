@@ -8,113 +8,139 @@ export default function App() {
   const sCanvasRef = useRef(null);
   const ctxRef = useRef(null);
   const sCtxRef = useRef(null);
-  const dprRef = useRef(window.devicePixelRatio || 1);
   const quantity = useRef(null);
   const algorithm = useRef(null);
+  const needsRedrawRef = useRef(false);
+  const canvasGeoRef = useRef({
+    width: 0,
+    height: 0,
+    cellWidth: 0,
+    heightStride: 0
+  });
   const [isRunning, setIsRunning] = useState(false);
 
+  const computeCanvasGeo = () => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const geo = canvasGeoRef.current;
+
+    geo.width = rect.width;
+    geo.height = rect.height;
+    geo.cellWidth = rect.width / quantity.current;
+    geo.heightStride = rect.height / quantity.current;
+  };
+
   useEffect(() => {
-    createModule().then(Module => {
-      wasmRef.current = Module;
-    }).catch(error => {
-      console.error("Error with loading WASM: ", error);
-    });
+    let resizeRaf = null;
+
+    // --- Load WASM once ---
+    createModule()
+      .then((Module) => {
+        wasmRef.current = Module;
+      })
+      .catch((error) => {
+        console.error("Error with loading WASM:", error);
+      });
 
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const sCanvas = sCanvasRef.current;
+    if (!canvas || !sCanvas) return;
 
-    const setup = () => {
-      let rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+    // --- Get contexts ONCE ---
+    ctxRef.current = canvas.getContext("2d");
+    sCtxRef.current = sCanvas.getContext("2d");
 
-      dprRef.current = dpr;
+    const resize = () => {
+      // debounce resize to one per frame
+      if (resizeRaf !== null) return;
 
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round(rect.height * dpr);
+      if (quantity.current != null) {
+        computeCanvasGeo();
+        needsRedrawRef.current = true;
+      }
 
-      const ctx = canvas.getContext("2d");
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
 
-      ctxRef.current = ctx;
+        const dpr = window.devicePixelRatio || 1;
 
-      const sCanvas = sCanvasRef.current;
-      rect = sCanvas.getBoundingClientRect();
-      sCanvas.width = Math.round(rect.width * dpr);
-      sCanvas.height = Math.round(rect.height * dpr);
+        // ---- main canvas ----
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = Math.round(rect.width * dpr);
+        canvas.height = Math.round(rect.height * dpr);
 
-      const sCtx = sCanvas.getContext("2d");
-      sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const canvasGeo = canvasGeoRef.current;
+        const width = rect.width;
+        const height = rect.height;
+        canvasGeo.width = width;
+        canvasGeo.height = height;
 
-      sCtxRef.current = sCtx;
+        canvasGeo.cellWidth = width / Number(quantity.current);
+        canvasGeo.heightStride = height / Number(quantity.current);
 
-      sCtx.fillStyle = "white";
-      sCtx.font = "15px Fira Code";
-      sCtx.fillText("Operations done:", 20, 30);
-      sCtx.fillText("0", 170, 30);
+        const ctx = ctxRef.current;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // ---- stats canvas ----
+        const sRect = sCanvas.getBoundingClientRect();
+        sCanvas.width = Math.round(sRect.width * dpr);
+        sCanvas.height = Math.round(sRect.height * dpr);
+
+        const sCtx = sCtxRef.current;
+        sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // redraw static UI only
+        sCtx.clearRect(0, 0, sCanvas.width, sCanvas.height);
+        sCtx.fillStyle = "white";
+        sCtx.font = "15px Fira Code";
+        sCtx.fillText("Operations done:", 20, 30);
+
+        // mark that main canvas needs redraw
+        needsRedrawRef.current = true;
+      });
     };
 
-    setup();
-    window.addEventListener("resize", setup);
+    // initial setup
+    resize();
 
-    return () => window.removeEventListener("resize", setup);
+    window.addEventListener("resize", resize);
+
+    return () => {
+      window.removeEventListener("resize", resize);
+      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
+    };
   }, []);
 
   useEffect(() => {
     if (!isRunning) return;
-    console.log("entering useEffect");
 
     const Module = wasmRef.current;
     const ctx = ctxRef.current;
     const sCtx = sCtxRef.current;
     let rafId;
     const swapOp = algorithm.current == 2;
-    let loop;
 
     initCanvas(Module, ctx);
-    console.log("frontend canvas initialized");
-    if (swapOp) {
-      loop = () => {
-        let ptr = Module._step();
-        let heap = Module.HEAP64;
+    const loop = () => {
+      if (needsRedrawRef.current) {
+        needsRedrawRef.current = false;
+        initCanvas(Module, ctxRef.current);
+        updateOpCnt(sCtxRef.current);
+      }
 
-        let base = ptr / 8;
-        // console.log(heap[base], heap[base + 1]);
-        if (heap[base] === -1n) {
-          setIsRunning(false);
-          return;
-        }
-        updateOpCnt(sCtx);
-        // console.log("drawing");
-        draw(ctx, sCtx, heap[base], heap[base + 1]);
+      const ptr = Module._step();
+      const heap = Module.HEAP32;
 
-        ptr = Module._step();
-        base = ptr / 8;
-        draw(ctx, sCtx, heap[base], heap[base + 1]);
+      const base = ptr / 4;
+      if (heap[base] === -1) {
+        setIsRunning(false);
+        return;
+      }
+      updateOpCnt(sCtx);
+      draw(ctx, heap[base], heap[base + 1]);
 
+      rafId = requestAnimationFrame(loop);
+    };
 
-        rafId = requestAnimationFrame(loop);
-      };
-    }
-    else {
-      loop = () => {
-        console.log("draw loop executed");
-        const ptr = Module._step();
-        const heap = Module.HEAP64;
-
-        const base = ptr / 8;
-        // console.log(heap[base], heap[base + 1]);
-        if (heap[base] === -1n) {
-          setIsRunning(false);
-          return;
-        }
-        // console.log("drawing");
-        updateOpCnt(sCtx);
-        draw(ctx, sCtx, heap[base], heap[base + 1]);
-
-        rafId = requestAnimationFrame(loop);
-      };
-    }
-    console.log("entering draw loop");
     rafId = requestAnimationFrame(loop);
 
     return () => {
@@ -125,31 +151,32 @@ export default function App() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    const Module = wasmRef.current;
+    if (!Module) return;
+
     const formData = new FormData(e.currentTarget);
-    const _quantity = BigInt(formData.get("quantity"));
+    const _quantity = Number(formData.get("quantity"));
     const _algorithm = Number(formData.get("algorithm"));
     quantity.current = _quantity;
     algorithm.current = _algorithm;
-    console.log("frontend form submitted");
 
-    const Module = wasmRef.current;
-    Module._init(_quantity, _algorithm);
     setIsRunning(true);
+
+    requestAnimationFrame(() => {
+      Module._init(_quantity, _algorithm);
+      computeCanvasGeo();
+      initCanvas(wasmRef.current, ctxRef.current);
+    });
   }
 
   const initCanvas = (Module, ctx) => {
     const body_ptr = Module._get_arr();
-    const heap = Module.HEAP64;
+    const heap = Module.HEAP32;
 
-    const stride = 8 / 8;
-    const base = body_ptr / 8;
+    const stride = 1;
+    const base = body_ptr / 4;
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
-
-    const cellWidth = width / Number(quantity.current);
-    const heightStride = height / Number(quantity.current);
+    const { width, height, cellWidth, heightStride } = canvasGeoRef.current;
 
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "white";
@@ -157,22 +184,14 @@ export default function App() {
     ctx.beginPath();
     for (let i = 0; i < quantity.current; i++) {
       const idx = base + i * stride;
-      // console.log("i: %d, num: %d", i, heap[idx]);
       const cellHeight = Number(heap[idx]) * heightStride;
-      // console.log(cellWidth, height, cellHeight);
       ctx.rect(cellWidth * i, height - cellHeight, cellWidth, cellHeight);
       ctx.fill();
     }
   }
 
-  const draw = (ctx, sCtx, idx, val) => {
-    // console.log("updating index %d with value %d", idx, val);
-    const rect = canvasRef.current.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
-
-    const cellWidth = width / Number(quantity.current);
-    const heightStride = height / Number(quantity.current);
+  const draw = (ctx, idx, val) => {
+    const { height, cellWidth, heightStride } = canvasGeoRef.current;
 
     // opsCnt.current++;
 
@@ -180,21 +199,21 @@ export default function App() {
     ctx.fillStyle = "white";
 
     ctx.beginPath();
-    const cellHeight = Number(val) * heightStride;
+    const cellHeight = val * heightStride;
     ctx.rect(cellWidth * Number(idx), height - cellHeight, cellWidth, cellHeight);
     ctx.fill();
   }
 
   const updateOpCnt = (sCtx) => {
     const Module = wasmRef.current;
-    const heap = Module.HEAP64;
-    const base = Module._get_op_cnt() / 8;
+    const heap = Module.HEAP32;
+    const base = Module._get_op_cnt() / 4;
     const cnt = heap[base];
 
     sCtx.fillStyle = "white";
     sCtx.font = "15px Fira Code";
     sCtx.clearRect(100, 0, 200, 100);
-    sCtx.fillText(String(algorithm.current >= 1 ? cnt / BigInt(2) : cnt), 170, 30);
+    sCtx.fillText(String(algorithm.current >= 1 ? (cnt / 2) : cnt), 170, 30);
   }
 
   return (
@@ -216,6 +235,7 @@ export default function App() {
               <option value="3">Selection</option>
               <option value="4">Bubble</option>
               <option value="5">Heap</option>
+              <option value="6">Cycle</option>
             </select>
           </div>
 
