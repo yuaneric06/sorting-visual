@@ -4,6 +4,7 @@ import './App.css'
 
 export default function App() {
   const wasmRef = useRef(null);
+  const heapRef = useRef(null);
   const canvasRef = useRef(null);
   const sCanvasRef = useRef(null);
   const ctxRef = useRef(null);
@@ -114,10 +115,11 @@ export default function App() {
     if (!isRunning) return;
 
     const Module = wasmRef.current;
+    heapRef.current = Module.HEAP32;
     const ctx = ctxRef.current;
     const sCtx = sCtxRef.current;
     let rafId;
-    const swapOp = algorithm.current == 2;
+    const heap = heapRef.current;
 
     initCanvas(Module, ctx);
     const loop = () => {
@@ -128,7 +130,6 @@ export default function App() {
       }
 
       const ptr = Module._step();
-      const heap = Module.HEAP32;
 
       const base = ptr / 4;
       if (heap[base] === -1) {
@@ -162,18 +163,15 @@ export default function App() {
 
     setIsRunning(true);
 
-    requestAnimationFrame(() => {
-      Module._init(_quantity, _algorithm);
-      computeCanvasGeo();
-      initCanvas(wasmRef.current, ctxRef.current);
-    });
+    Module._init(_quantity, _algorithm);
+    computeCanvasGeo();
+    initCanvas(wasmRef.current, ctxRef.current);
   }
 
   const initCanvas = (Module, ctx) => {
     const body_ptr = Module._get_arr();
-    const heap = Module.HEAP32;
+    const heap = heapRef.current;
 
-    const stride = 1;
     const base = body_ptr / 4;
 
     const { width, height, cellWidth, heightStride } = canvasGeoRef.current;
@@ -183,11 +181,11 @@ export default function App() {
 
     ctx.beginPath();
     for (let i = 0; i < quantity.current; i++) {
-      const idx = base + i * stride;
+      const idx = base + i;
       const cellHeight = Number(heap[idx]) * heightStride;
       ctx.rect(cellWidth * i, height - cellHeight, cellWidth, cellHeight);
-      ctx.fill();
     }
+    ctx.fill();
   }
 
   const draw = (ctx, idx, val) => {
@@ -206,14 +204,14 @@ export default function App() {
 
   const updateOpCnt = (sCtx) => {
     const Module = wasmRef.current;
-    const heap = Module.HEAP32;
+    const heap = heapRef.current;
     const base = Module._get_op_cnt() / 4;
     const cnt = heap[base];
 
     sCtx.fillStyle = "white";
     sCtx.font = "15px Fira Code";
     sCtx.clearRect(100, 0, 200, 100);
-    sCtx.fillText(String(algorithm.current >= 1 ? (cnt / 2) : cnt), 170, 30);
+    sCtx.fillText(String(cnt), 170, 30);
   }
 
   return (
@@ -236,6 +234,7 @@ export default function App() {
               <option value="4">Bubble</option>
               <option value="5">Heap</option>
               <option value="6">Cycle</option>
+              <option value="7">Three way merge</option>
             </select>
           </div>
 

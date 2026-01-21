@@ -18,6 +18,8 @@ private:
     void heapify(int n, int root);
     void heap_sort();
     void cycle_sort();
+    void three_way_merge_sort(int l, int r);
+    void three_way_merge(int l, int mid1, int mid2, int r);
     std::queue<Op> ops;
     static int op_cnt;
 

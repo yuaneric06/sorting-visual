@@ -53,6 +53,9 @@ void Engine::init(int quantity, int algorithm)
     case 6:
         cycle_sort();
         break;
+    case 7:
+        three_way_merge_sort(0, quantity - 1);
+        break;
     }
 }
 
@@ -318,4 +321,84 @@ void Engine::cycle_sort()
             }
         }
     }
+}
+
+void Engine::three_way_merge(int l, int mid1, int mid2, int r)
+{
+    int len1 = mid1 - l + 1;
+    int len2 = mid2 - mid1;
+    int len3 = r - mid2;
+
+    std::vector<int> arr1(len1), arr2(len2), arr3(len3);
+
+    for (int i = 0; i < len1; i++)
+    {
+        arr1[i] = arr[l + i];
+    }
+    for (int i = 0; i < len2; i++)
+    {
+        arr2[i] = arr[mid1 + i + 1];
+    }
+    for (int i = 0; i < len3; i++)
+    {
+        arr3[i] = arr[mid2 + i + 1];
+    }
+
+    int k = l;
+    int i = 0, j = 0, h = 0;
+    while (i < len1 || j < len2 || h < len3)
+    {
+        int min_val = INT_MAX, min_idx = -1;
+
+        if (i < len1 && arr1[i] <= min_val)
+        {
+            min_val = arr1[i];
+            min_idx = 0;
+        }
+        if (j < len2 && arr2[j] <= min_val)
+        {
+            min_val = arr2[j];
+            min_idx = 1;
+        }
+        if (h < len3 && arr3[h] <= min_val)
+        {
+            min_val = arr3[h];
+            min_idx = 2;
+        }
+
+        if (min_idx == 0)
+        {
+            arr[k] = arr1[i];
+            i++;
+        }
+        else if (min_idx == 1)
+        {
+            arr[k] = arr2[j];
+            j++;
+        }
+        else
+        {
+            arr[k] = arr3[h];
+            h++;
+        }
+        ops.push({k, arr[k]});
+        k++;
+    }
+}
+
+void Engine::three_way_merge_sort(int l, int r)
+{
+    if (l >= r)
+    {
+        return;
+    }
+
+    int mid1 = l + (r - l) / 3;
+    int mid2 = l + (r - l) / 3 * 2;
+
+    three_way_merge_sort(l, mid1);
+    three_way_merge_sort(mid1 + 1, mid2);
+    three_way_merge_sort(mid2 + 1, r);
+
+    three_way_merge(l, mid1, mid2, r);
 }
