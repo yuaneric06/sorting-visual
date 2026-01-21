@@ -1,0 +1,1 @@
+*{margin:0}html,body{height:100%}body{background-color:#1f1f1f;color:#fff;font-family:Fira Code}main{height:100vh;display:flex;flex-direction:column;min-height:0}.mainCanvas{min-height:0;flex:1 1 auto;display:block;box-sizing:border-box}header{display:flex;justify-content:space-between}.stats{flex:1 1 auto;height:60px}
