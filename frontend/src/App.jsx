@@ -121,7 +121,6 @@ export default function App() {
     let rafId;
     const heap = heapRef.current;
 
-    initCanvas(Module, ctx);
     if (algorithm.current == 10) {
       vibeSort();
       return;
@@ -259,7 +258,6 @@ export default function App() {
   };
 
   const vibeSort = async () => {
-    console.log("vibing");
     const ctx = ctxRef.current;
     const sCtx = sCtxRef.current;
     ctx.fillStyle = "white";
@@ -294,8 +292,9 @@ export default function App() {
       console.error("Error: ", error);
       sCtx.clearRect(0, 0, sWidth, sHeight);
       sCtx.fillText("Error with prompting AI\ncheck dev console for details", sWidth / 2, sHeight / 2);
+      setIsRunning(false);
+      return;
     });
-    console.log(response.text);
     const sortedArr = JSON.parse(response.text);
 
 
@@ -309,6 +308,8 @@ export default function App() {
     ctx.fill();
     sCtx.clearRect(0, 0, sWidth, sHeight);
     sCtx.fillText("Vibe sorting completed", sWidth / 2, sHeight / 2);
+    setIsRunning(false);
+    return;
   }
 
   return (

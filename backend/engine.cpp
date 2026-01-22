@@ -20,7 +20,7 @@ void Engine::scramble()
 
 void Engine::init(int quantity, int algorithm)
 {
-    std::cout << "running the " << algorithm << " algorithm with " << quantity << " units\n";
+    // std::cout << "running the " << algorithm << " algorithm with " << quantity << " units\n";
     op_cnt = 0;
     runtime = 0;
     arr.resize(quantity);
@@ -31,7 +31,7 @@ void Engine::init(int quantity, int algorithm)
         arr[i - 1] = i;
     }
     scramble();
-    std::cout << "array of size " << quantity << " has been scrambled\n";
+    // std::cout << "array of size " << quantity << " has been scrambled\n";
     original_arr = arr;
     auto start = std::chrono::steady_clock::now();
     switch (algorithm)
