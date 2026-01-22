@@ -23,4 +23,9 @@ extern "C"
     {
         return engine.get_arr();
     }
+
+    long long *get_runtime()
+    {
+        return engine.get_runtime();
+    }
 }

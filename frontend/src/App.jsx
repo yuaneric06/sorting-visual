@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import createModule from './wasm/sim.js'
+import apiKeys from './hidden.js'
+import { GoogleGenAI } from '@google/genai';
 import './App.css'
 
 export default function App() {
@@ -19,6 +21,7 @@ export default function App() {
     heightStride: 0
   });
   const [isRunning, setIsRunning] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
 
   const computeCanvasGeo = () => {
     const rect = canvasRef.current.getBoundingClientRect();
@@ -81,7 +84,6 @@ export default function App() {
         const ctx = ctxRef.current;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        // ---- stats canvas ----
         const sRect = sCanvas.getBoundingClientRect();
         sCanvas.width = Math.round(sRect.width * dpr);
         sCanvas.height = Math.round(sRect.height * dpr);
@@ -89,13 +91,10 @@ export default function App() {
         const sCtx = sCtxRef.current;
         sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        // redraw static UI only
         sCtx.clearRect(0, 0, sCanvas.width, sCanvas.height);
         sCtx.fillStyle = "white";
         sCtx.font = "15px Fira Code";
-        sCtx.fillText("Operations done:", 20, 30);
 
-        // mark that main canvas needs redraw
         needsRedrawRef.current = true;
       });
     };
@@ -114,6 +113,7 @@ export default function App() {
   useEffect(() => {
     if (!isRunning) return;
 
+
     const Module = wasmRef.current;
     heapRef.current = Module.HEAP32;
     const ctx = ctxRef.current;
@@ -122,6 +122,11 @@ export default function App() {
     const heap = heapRef.current;
 
     initCanvas(Module, ctx);
+    if (algorithm.current == 10) {
+      vibeSort();
+      return;
+    }
+
     const loop = () => {
       if (needsRedrawRef.current) {
         needsRedrawRef.current = false;
@@ -134,6 +139,7 @@ export default function App() {
       const base = ptr / 4;
       if (heap[base] === -1) {
         setIsRunning(false);
+        setIsFinished(true);
         return;
       }
       updateOpCnt(sCtx);
@@ -147,7 +153,12 @@ export default function App() {
     return () => {
       cancelAnimationFrame(rafId)
     };
-  }, [isRunning])
+  }, [isRunning]);
+
+  useEffect(() => {
+    calculateWritesPerElement(sCtxRef.current);
+    displayRuntime(sCtxRef.current);
+  }, [isFinished]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -161,9 +172,10 @@ export default function App() {
     quantity.current = _quantity;
     algorithm.current = _algorithm;
 
-    setIsRunning(true);
-
     Module._init(_quantity, _algorithm);
+    setIsRunning(true);
+    setIsFinished(false);
+
     computeCanvasGeo();
     initCanvas(wasmRef.current, ctxRef.current);
   }
@@ -171,6 +183,7 @@ export default function App() {
   const initCanvas = (Module, ctx) => {
     const body_ptr = Module._get_arr();
     const heap = heapRef.current;
+    if (!heap) return;
 
     const base = body_ptr / 4;
 
@@ -207,11 +220,95 @@ export default function App() {
     const heap = heapRef.current;
     const base = Module._get_op_cnt() / 4;
     const cnt = heap[base];
+    const canvas = sCtx.canvas;
+
+    sCtx.clearRect(0, 0, canvas.width, canvas.height);
+    sCtx.fillStyle = "white";
+    sCtx.font = "15px Fira Code";
+    sCtx.fillText(`Writes: ${cnt}`, 50, 20);
+  }
+
+  const displayRuntime = (sCtx) => {
+    const Module = wasmRef.current;
+    if (!Module) return;
+    const heap = Module.HEAP64;
+    const base = Module._get_runtime() / 8;
+    const runtime = heap[base];
+
+    sCtx.fillText(`Runtime (ms): ${runtime}`, 50, 50);
+  }
+
+  const calculateWritesPerElement = (sCtx) => {
+    const Module = wasmRef.current;
+    if (!Module || quantity.current == null) return;
+
+    const heap = heapRef.current;
+    const base = Module._get_op_cnt() / 4;
+    const writes = heap[base];
+    const n = quantity.current;
+
+    const writesPerElement = writes / n;
+
+    const canvas = sCtx.canvas;
 
     sCtx.fillStyle = "white";
     sCtx.font = "15px Fira Code";
-    sCtx.clearRect(100, 0, 200, 100);
-    sCtx.fillText(String(cnt), 170, 30);
+
+    sCtx.fillText("Writes / element:", 20, 35);
+    sCtx.fillText(writesPerElement.toFixed(2), 200, 35);
+  };
+
+  const vibeSort = async () => {
+    console.log("vibing");
+    const ctx = ctxRef.current;
+    const sCtx = sCtxRef.current;
+    ctx.fillStyle = "white";
+    ctx.font = "15px Fira Code";
+    const { width, height, cellWidth, heightStride } = canvasGeoRef.current;
+    const rect = sCanvasRef.current.getBoundingClientRect();
+    const sWidth = rect.width;
+    const sHeight = rect.height;
+    sCtx.fillText("Prompting AI...", sWidth / 2, sHeight / 2);
+    const unsortedArray = Array(quantity.current);
+
+    const Module = wasmRef.current;
+    const body_ptr = Module._get_arr();
+    const heap = heapRef.current;
+    if (!heap) return;
+
+    const base = body_ptr / 4;
+
+
+    for (let i = 0; i < quantity.current; i++) {
+      const idx = base + i;
+      unsortedArray[i] = Number(heap[idx]);
+    }
+
+    const ai = new GoogleGenAI({ apiKey: apiKeys.geminiApiKey });
+    const requestText = `Here's an array of integers in Javascript. Return the array but sorted. Only return the array, do not add anything extra: [${unsortedArray}]`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: requestText,
+    }).catch(error => {
+      console.error("Error: ", error);
+      sCtx.clearRect(0, 0, sWidth, sHeight);
+      sCtx.fillText("Error with prompting AI\ncheck dev console for details", sWidth / 2, sHeight / 2);
+    });
+    console.log(response.text);
+    const sortedArr = JSON.parse(response.text);
+
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    for (let i = 0; i < sortedArr.length; i++) {
+      const cellHeight = sortedArr[i] * heightStride;
+      ctx.rect(cellWidth * i, height - cellHeight, cellWidth, cellHeight);
+    }
+    ctx.fill();
+    sCtx.clearRect(0, 0, sWidth, sHeight);
+    sCtx.fillText("Vibe sorting completed", sWidth / 2, sHeight / 2);
   }
 
   return (
@@ -219,13 +316,13 @@ export default function App() {
       <header>
         <form onSubmit={handleSubmit}>
           <div className="option">
-            <label for="quantity">Element count: </label>
-            <input type="number" id="quantity" name="quantity" />
+            <label htmlFor="quantity">Element count: </label>
+            <input type="number" id="quantity" name="quantity" required />
           </div>
 
           <div className="option">
-            <label for="algorithm">Algorithm: </label>
-            <select name="algorithm" id="algorithm">
+            <label htmlFor="algorithm">Algorithm: </label>
+            <select name="algorithm" id="algorithm" required >
               <option value="" disable select hidden>Select an algorithm</option>
               <option value="0">Merge</option>
               <option value="1">Insertion</option>
@@ -235,6 +332,10 @@ export default function App() {
               <option value="5">Heap</option>
               <option value="6">Cycle</option>
               <option value="7">Three way merge</option>
+              <option value="8">Bogo</option>
+              <option value="9">Stalin</option>
+              <option value="-1">Miracle</option>
+              <option value="10">Vibe</option>
             </select>
           </div>
 

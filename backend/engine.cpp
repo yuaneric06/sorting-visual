@@ -3,8 +3,10 @@
 #include <ctime>
 #include <utility>
 #include <iostream>
+#include <chrono>
 
 int Engine::op_cnt = 0;
+long long Engine::runtime = 0;
 
 void Engine::scramble()
 {
@@ -20,6 +22,7 @@ void Engine::init(int quantity, int algorithm)
 {
     std::cout << "running the " << algorithm << " algorithm with " << quantity << " units\n";
     op_cnt = 0;
+    runtime = 0;
     arr.resize(quantity);
     while (!ops.empty())
         ops.pop();
@@ -30,6 +33,7 @@ void Engine::init(int quantity, int algorithm)
     scramble();
     std::cout << "array of size " << quantity << " has been scrambled\n";
     original_arr = arr;
+    auto start = std::chrono::steady_clock::now();
     switch (algorithm)
     {
     case 0:
@@ -56,7 +60,16 @@ void Engine::init(int quantity, int algorithm)
     case 7:
         three_way_merge_sort(0, quantity - 1);
         break;
+    case 8:
+        bogo_sort();
+        break;
+    case 9:
+        stalin_sort();
+        break;
     }
+    auto end = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    runtime = duration.count();
 }
 
 int *Engine::get_arr()
@@ -67,6 +80,11 @@ int *Engine::get_arr()
 int *Engine::get_op_cnt()
 {
     return &op_cnt;
+}
+
+long long *Engine::get_runtime()
+{
+    return &runtime;
 }
 
 Op *Engine::step()
@@ -401,4 +419,50 @@ void Engine::three_way_merge_sort(int l, int r)
     three_way_merge_sort(mid2 + 1, r);
 
     three_way_merge(l, mid1, mid2, r);
+}
+
+void Engine::bogo_scramble()
+{
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+    for (int i = arr.size() - 1; i > 0; i--)
+    {
+        int randIdx = std::rand() % i;
+        std::swap(arr[i], arr[randIdx]);
+        ops.push({i, arr[i]});
+        ops.push({randIdx, arr[randIdx]});
+    }
+}
+
+void Engine::bogo_sort()
+{
+    while (!is_sorted())
+    {
+        bogo_scramble();
+    }
+}
+
+bool Engine::is_sorted()
+{
+    for (int i = 1; i < arr.size(); i++)
+    {
+        if (arr[i] < arr[i - 1])
+            return false;
+    }
+    return true;
+}
+
+void Engine::stalin_sort()
+{
+    int curr = arr[0];
+    for (int i = 1; i < arr.size(); i++)
+    {
+        if (arr[i] < curr)
+        {
+            ops.push({i, 0});
+        }
+        else
+        {
+            curr = arr[i];
+        }
+    }
 }
