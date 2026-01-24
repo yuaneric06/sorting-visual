@@ -1,1 +1,1 @@
-emcc .\exports.cpp .\engine.cpp -O3 -s MODULARIZE=1 -s EXPORT_ES6=1 -s ENVIRONMENT=web -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_FUNCTIONS='["_run"]' -s EXPORTED_RUNTIME_METHODS='["HEAPF64"]' -sASSERTIONS -o ..\frontend\src\wasm\sim.js
+emcc .\exports.cpp .\engine.cpp -O1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s ENVIRONMENT=web -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_FUNCTIONS='["_init", "_get_arr", "_step", "_get_op_cnt", "_get_runtime"]' -s EXPORTED_RUNTIME_METHODS='["HEAP32", "HEAP64"]' -sASSERTIONS -o ..\frontend\src\wasm\sim.js

@@ -336,7 +336,7 @@ export default function App() {
               <option value="8">Bogo</option>
               <option value="9">Stalin</option>
               <option value="-1">Miracle</option>
-              <option value="10">Vibe</option>
+              {/* <option value="10">Vibe</option> */}
             </select>
           </div>
 
